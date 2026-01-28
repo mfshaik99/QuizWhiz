@@ -7,7 +7,7 @@ from datetime import datetime
 # ------------------------
 # Connect to SQLite DB
 # ------------------------
-conn = sqlite3.connect("quizwiz.db", check_same_thread=False)
+conn = sqlite3.connect("quizwhiz.db", check_same_thread=False)
 cursor = conn.cursor()
 
 # ------------------------
