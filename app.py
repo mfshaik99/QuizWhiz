@@ -29,18 +29,18 @@ if 'answer_times' not in st.session_state:
 # ------------------------
 # Title and quiz join
 # ------------------------
-st.title("🧠 QuizWiz - Online Quiz Platform")
+st.title("🧠 QuizWhiz - Online Quiz Platform")
 
-# Quiz link input
-quiz_id = st.text_input("Enter Quiz Link / ID", value="QZ1001")
+# Quiz link input (simulate)
+quiz_id = st.text_input("Enter Quiz Link / ID", value="QW1001")
 
 # User name input
 username = st.text_input("Enter Your Name")
 
-# Join quiz button
+# Join quiz
 if st.button("Join Quiz"):
     if username.strip() == "":
-        st.warning("Please enter your name to join the quiz!")
+        st.warning("Please enter your name!")
     else:
         st.session_state['quiz_started'] = True
         st.session_state['username'] = username
@@ -48,7 +48,8 @@ if st.button("Join Quiz"):
         st.session_state['question_index'] = 0
         st.session_state['score'] = 0
         st.session_state['answer_times'] = []
-        # Fetch 10 random questions for this quiz
+
+        # Fetch 10 random questions
         cursor.execute("SELECT * FROM questions ORDER BY RANDOM() LIMIT 10")
         st.session_state['questions'] = cursor.fetchall()
         st.session_state['start_time'] = time.time()
@@ -84,7 +85,7 @@ if st.session_state['quiz_started']:
             # Scoring logic
             points = 0
             if answer == correct_option:
-                points = 2 if time_taken <= 10 else 1  # fast correct: 2 pts, else 1
+                points = 2 if time_taken <= 10 else 1
             st.session_state['score'] += points
 
             # Save response to DB
@@ -116,16 +117,16 @@ if st.session_state['quiz_started']:
             ))
             conn.commit()
 
-            # Reset timer and move to next question
+            # Reset timer and go to next question
             st.session_state['start_time'] = time.time()
             st.session_state['question_index'] += 1
             st.experimental_rerun()
 
     else:
-        st.success(f"Quiz Completed! Your Score: {st.session_state['score']} / {len(questions)*2}")
+        st.success(f"🎉 Quiz Completed! Your Score: {st.session_state['score']} / {len(questions)*2}")
 
         # ------------------------
-        # Display leaderboard
+        # Leaderboard
         # ------------------------
         st.subheader("🏆 Leaderboard")
         cursor.execute("""
