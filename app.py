@@ -1,11 +1,11 @@
 import streamlit as st
 import sqlite3
-import random
 import time
 from datetime import datetime
+import ui  # Import UI components
 
 # ------------------------
-# Connect to SQLite DB
+# Connect to DB
 # ------------------------
 conn = sqlite3.connect("quizwhiz.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -27,62 +27,43 @@ if 'answer_times' not in st.session_state:
     st.session_state['answer_times'] = []
 
 # ------------------------
-# Title and quiz join
+# Show join screen
 # ------------------------
-st.title("🧠 QuizWhiz - Online Quiz Platform")
+if not st.session_state['quiz_started']:
+    quiz_id, username, join = ui.show_join_screen()
+    if join:
+        if username.strip() == "":
+            st.warning("Please enter your name!")
+        else:
+            st.session_state['quiz_started'] = True
+            st.session_state['username'] = username
+            st.session_state['quiz_id'] = quiz_id
+            st.session_state['question_index'] = 0
+            st.session_state['score'] = 0
+            st.session_state['answer_times'] = []
 
-# Quiz link input (simulate)
-quiz_id = st.text_input("Enter Quiz Link / ID", value="QW1001")
-
-# User name input
-username = st.text_input("Enter Your Name")
-
-# Join quiz
-if st.button("Join Quiz"):
-    if username.strip() == "":
-        st.warning("Please enter your name!")
-    else:
-        st.session_state['quiz_started'] = True
-        st.session_state['username'] = username
-        st.session_state['quiz_id'] = quiz_id
-        st.session_state['question_index'] = 0
-        st.session_state['score'] = 0
-        st.session_state['answer_times'] = []
-
-        # Fetch 10 random questions
-        cursor.execute("SELECT * FROM questions ORDER BY RANDOM() LIMIT 10")
-        st.session_state['questions'] = cursor.fetchall()
-        st.session_state['start_time'] = time.time()
-        st.success(f"Welcome {username}! Quiz {quiz_id} is starting...")
+            # Fetch 10 random questions
+            cursor.execute("SELECT * FROM questions ORDER BY RANDOM() LIMIT 10")
+            st.session_state['questions'] = cursor.fetchall()
+            st.session_state['start_time'] = time.time()
+            st.success(f"Welcome {username}! Quiz {quiz_id} is starting...")
 
 # ------------------------
-# Quiz display
+# Show quiz questions
 # ------------------------
 if st.session_state['quiz_started']:
-
     questions = st.session_state['questions']
     idx = st.session_state['question_index']
 
     if idx < len(questions):
         q = questions[idx]
-        question_id = q[0]
-        question_text = q[1]
-        options = [q[2], q[3], q[4], q[5]]
-        correct_option = q[6]
+        answer, submit, shuffled_options, correct_option, question_id = ui.show_question(q, idx, st.session_state['start_time'])
 
-        # Shuffle options
-        shuffled_options = options.copy()
-        random.shuffle(shuffled_options)
-
-        st.write(f"**Q{idx+1}: {question_text}**")
-        answer = st.radio("Select your answer:", shuffled_options, key=idx)
-
-        if st.button("Submit Answer"):
-            # Calculate time taken
+        if submit:
             time_taken = time.time() - st.session_state['start_time']
             st.session_state['answer_times'].append(time_taken)
 
-            # Scoring logic
+            # Scoring
             points = 0
             if answer == correct_option:
                 points = 2 if time_taken <= 10 else 1
@@ -117,18 +98,15 @@ if st.session_state['quiz_started']:
             ))
             conn.commit()
 
-            # Reset timer and go to next question
+            # Next question
             st.session_state['start_time'] = time.time()
             st.session_state['question_index'] += 1
             st.experimental_rerun()
 
     else:
-        st.success(f"🎉 Quiz Completed! Your Score: {st.session_state['score']} / {len(questions)*2}")
+        ui.show_score(st.session_state['score'], len(questions)*2)
 
-        # ------------------------
         # Leaderboard
-        # ------------------------
-        st.subheader("🏆 Leaderboard")
         cursor.execute("""
             SELECT username, SUM(score) as total_score
             FROM responses
@@ -137,5 +115,4 @@ if st.session_state['quiz_started']:
             ORDER BY total_score DESC
         """, (st.session_state['quiz_id'],))
         leaderboard = cursor.fetchall()
-        for i, row in enumerate(leaderboard, start=1):
-            st.write(f"{i}. {row[0]} - {row[1]} points")
+        ui.show_leaderboard(leaderboard)
