@@ -2,13 +2,22 @@ import streamlit as st
 import sqlite3
 import time
 from datetime import datetime
-import ui  # Import UI components
+import random
+import string
+import ui  # UI components
 
 # ------------------------
-# Connect to DB
+# Connect to SQLite DB
 # ------------------------
 conn = sqlite3.connect("quizwhiz.db", check_same_thread=False)
 cursor = conn.cursor()
+
+# ------------------------
+# Auto-create DB if missing
+# ------------------------
+import os
+if not os.path.exists("quizwhiz.db"):
+    import init_db
 
 # ------------------------
 # Initialize session state
@@ -27,29 +36,64 @@ if 'answer_times' not in st.session_state:
     st.session_state['answer_times'] = []
 
 # ------------------------
-# Show join screen
+# Helper: Generate Unique Quiz ID
 # ------------------------
-if not st.session_state['quiz_started']:
-    quiz_id, username, join = ui.show_join_screen()
-    if join:
-        if username.strip() == "":
-            st.warning("Please enter your name!")
-        else:
-            st.session_state['quiz_started'] = True
-            st.session_state['username'] = username
-            st.session_state['quiz_id'] = quiz_id
-            st.session_state['question_index'] = 0
-            st.session_state['score'] = 0
-            st.session_state['answer_times'] = []
-
-            # Fetch 10 random questions
-            cursor.execute("SELECT * FROM questions ORDER BY RANDOM() LIMIT 10")
-            st.session_state['questions'] = cursor.fetchall()
-            st.session_state['start_time'] = time.time()
-            st.success(f"Welcome {username}! Quiz {quiz_id} is starting...")
+def generate_quiz_id():
+    return "QW" + ''.join(random.choices(string.digits, k=4))
 
 # ------------------------
-# Show quiz questions
+# Landing / Join Screen
+# ------------------------
+st.title("🧠 QuizWhiz - Online Quiz Platform")
+
+# Option to create new quiz
+create_new = st.button("Create New Quiz")
+quiz_id_input = st.text_input("Or Enter Quiz Link / ID to Join")
+
+username = st.text_input("Enter Your Name")
+
+# Handle quiz creation
+if create_new:
+    if username.strip() == "":
+        st.warning("Please enter your name to create a quiz!")
+    else:
+        quiz_id = generate_quiz_id()
+        st.success(f"Quiz created! Your Quiz ID is: {quiz_id}")
+        st.session_state['quiz_started'] = True
+        st.session_state['username'] = username
+        st.session_state['quiz_id'] = quiz_id
+        st.session_state['question_index'] = 0
+        st.session_state['score'] = 0
+        st.session_state['answer_times'] = []
+        # Fetch 10 random questions
+        cursor.execute("SELECT * FROM questions ORDER BY RANDOM() LIMIT 10")
+        st.session_state['questions'] = cursor.fetchall()
+        st.session_state['start_time'] = time.time()
+        st.experimental_rerun()
+
+# Handle join existing quiz
+elif st.button("Join Quiz"):
+    if username.strip() == "":
+        st.warning("Please enter your name!")
+    elif quiz_id_input.strip() == "":
+        st.warning("Please enter a Quiz ID!")
+    else:
+        quiz_id = quiz_id_input.strip()
+        st.session_state['quiz_started'] = True
+        st.session_state['username'] = username
+        st.session_state['quiz_id'] = quiz_id
+        st.session_state['question_index'] = 0
+        st.session_state['score'] = 0
+        st.session_state['answer_times'] = []
+        # Fetch 10 random questions
+        cursor.execute("SELECT * FROM questions ORDER BY RANDOM() LIMIT 10")
+        st.session_state['questions'] = cursor.fetchall()
+        st.session_state['start_time'] = time.time()
+        st.success(f"Welcome {username}! Quiz {quiz_id} is starting...")
+        st.experimental_rerun()
+
+# ------------------------
+# Quiz Display
 # ------------------------
 if st.session_state['quiz_started']:
     questions = st.session_state['questions']
@@ -63,7 +107,7 @@ if st.session_state['quiz_started']:
             time_taken = time.time() - st.session_state['start_time']
             st.session_state['answer_times'].append(time_taken)
 
-            # Scoring
+            # Scoring: fast correct = 2 pts, else 1 pt
             points = 0
             if answer == correct_option:
                 points = 2 if time_taken <= 10 else 1
@@ -104,9 +148,10 @@ if st.session_state['quiz_started']:
             st.experimental_rerun()
 
     else:
+        # Show final score
         ui.show_score(st.session_state['score'], len(questions)*2)
 
-        # Leaderboard
+        # Show leaderboard
         cursor.execute("""
             SELECT username, SUM(score) as total_score
             FROM responses
